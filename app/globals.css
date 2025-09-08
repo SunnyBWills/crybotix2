@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #fff;
+  --bg2: #e3e3e3;
+  --text: #666;
+  --accent1: #DEF69B;
+  --accent2: #f8e682;
+  --glass: rgba(255,255,255,0.85);
+  --border: rgba(255,255,255,0.9);
+  --blur: 18px;
+  --radius: 10px;
+  --shadow: 0 12px 32px rgba(0,0,0,0.12);
+  --grid: #e8eef5;
+}
+
+body {
+  @apply bg-bg2 text-text min-h-screen; 
+}
