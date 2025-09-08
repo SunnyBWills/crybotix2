@@ -1,3 +1,5 @@
+"use client";
+
 import { TradeDecision, tradeSchema, type TradeData } from "@/components/trade-decision";
 import { Positions } from "@/components/positions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
