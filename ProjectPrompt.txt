@@ -1,0 +1,197 @@
+# DifyでJSON化 → Slack承認 → 外部API発注
+
+## 目的 / ゴール
+
+- Discord等の情報（テキスト/画像）をLLMで**構造化JSON**に変換
+- 変換結果を**Slackへボタン付き**で通知（承認/却下）
+- **承認時のみ**外部API（自前FastAPI→Bybitなど）へ発注
+
+### 成果物（Definition of Done）
+
+- [ ]  Difyワークフローで**JSON Schema出力が安定**（スキーマ準拠）
+- [ ]  Slackに**Block Kit＋承認/却下ボタン**通知が出る
+- [ ]  承認押下 → **外部API**にJSONが渡り（Dry-run/Live切替可）、結果がSlackに戻る
+
+---
+
+## 全体アーキテクチャ
+
+```
+[Uploader/UI or 手動入力]
+      │  (画像)
+      ▼
+[Dify Workflow]
+  ├─ LLMノード（JSON Schema出力）
+  └─ HTTPノード → Slack chat.postMessage（承認/却下ボタン）
+                         │
+                         ▼
+                  [Slack Interactivity]
+                         │（承認/却下）
+                         ▼
+                 [外部API FastAPI]
+                    ├─ ルール/冪等性/ドライラン
+                    ├─ 取引所API（Bybit 等）
+                    └─ Slackへ結果返信 / ログ保存
+
+```
+
+---
+
+## 環境・秘密情報（ENV）
+
+- OPENAI_API_KEY（Difyに設定）
+- SLACK_BOT_TOKEN（xoxb-…）
+- SLACK_CHANNEL_ID（通知先）
+- SLACK_SIGNING_SECRET（外部APIで署名検証に使用）
+- BYBIT_API_KEY / BYBIT_API_SECRET（外部API側）
+- APP_MODE（`dry-run` or `live`）
+
+---
+
+## JSONスキーマ（Dify LLMノード用・構造化出力）
+
+👑これはDraft。これで本当にいいかは今後のプロジェクトで深度深く考察する。
+
+```json
+{
+  "name": "trade_decision",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "symbol": { "type": "string" },
+      "side": { "type": "string", "enum": ["BUY", "SELL"] },
+      "entry": { "type": "number" },
+      "take_profit": { "type": "number" },
+      "stop_loss": { "type": "number" },
+      "confidence": { "type": "number" },
+      "reason": { "type": "string" },
+      "id": { "type": "string" },
+      "no_trade": { "type": "boolean" }
+    },
+    "required": [
+      "symbol","side","entry","take_profit","stop_loss",
+      "confidence","reason","id","no_trade"
+    ],
+    "additionalProperties": false}
+}
+```
+
+### LLMシステムプロンプト（抜粋）
+
+- 役割：トレードアシスタント
+- 入力：画像（サポート・レジスタンス等の情報）
+- 出力：**上記スキーマのJSONのみ**（説明文や余計な文字は禁止）
+- 不確実な時は `no_trade=true` とし、`reason` に明記
+
+---
+
+## Slack通知（HTTPノード：chat.postMessage例）
+
+👑これはDraft。これで本当にいいかは今後のプロジェクトで深度深く考察する。
+
+**Method:** POST
+
+**URL:** `https://slack.com/api/chat.postMessage`
+
+**Headers:**
+
+- Authorization: `Bearer {{SLACK_BOT_TOKEN}}`
+- Content-Type: `application/json`
+
+**Body 例（Blocks含む）**
+
+```json
+{
+  "channel": "{{SLACK_CHANNEL_ID}}",
+  "text": "新しいトレード提案があります",
+  "blocks": [
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn",
+        "text": "*{{symbol}} 提案*\nSide: {{side}}\nEntry: {{entry}}  TP: {{take_profit}}  SL: {{stop_loss}}\n信頼度: {{confidence}}\nno_trade: {{no_trade}}\n理由: {{reason}}"
+      }
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": { "type": "plain_text", "text": "承認して発注" },
+          "style": "primary",
+          "action_id": "approve",
+          "value": "{{id}}"
+        },
+        {
+          "type": "button",
+          "text": { "type": "plain_text", "text": "却下" },
+          "style": "danger",
+          "action_id": "reject",
+          "value": "{{id}}"
+        }
+      ]
+    }
+  ]
+}
+```
+
+> 注: {{…}} はDify内でLLMノードの出力にバインド。id は冪等性キーとして後段で使用。
+> 
+
+---
+
+## 外部API（FastAPI）仕様（承認/却下受け口）
+
+👑これはDraft。これで本当にいいかは今後のプロジェクトで深度深く考察する。
+
+### 1) SlackインタラクションURL
+
+- **Endpoint:** `POST /slack/interactions`
+- **処理:** 署名検証（`X-Slack-Signature` / `X-Slack-Request-Timestamp`）→ `payload.actions[0].action_id` が `"approve"` なら発注キューへ、`"reject"` なら却下ログ
+- **応答:** 3秒以内にACK（メッセージ更新テキスト返却）
+
+### 2) 発注ワーカー（非同期）
+
+- 入力: `{ id, symbol, side, entry, take_profit, stop_loss, confidence, no_trade }`
+- **ガード:**
+    - `no_trade==false` かつ `confidence >= 閾値`
+    - 銘柄ホワイトリスト
+    - 金額/サイズ上限、時間帯制限
+    - **冪等性**（同じ `id` は二重発注しない）
+- 実行: Bybit/ccxtで注文 → 結果をSlackへ返信
+- ログ: すべて保存（入力・出力・注文ID・タイムスタンプ）
+
+---
+
+## タスクWBS（実装順）
+
+### フェーズ1：基盤準備
+
+- [ ]  Slack App作成（Botユーザー・Interactivity ON）
+- [ ]  権限：`chat:write`（必要に応じ `chat:write.public`）
+- [ ]  Request URLに外部API `/slack/interactions` を設定
+- [ ]  外部API（FastAPI）雛形をデプロイ（ngrok/Cloud Run/VPS等で外部到達）
+
+### フェーズ2：Difyワークフロー
+
+- [ ]  新規アプリ/ワークフロー作成
+- [ ]  **LLMノード**追加（モデル選定、**JSON Schema**設定）
+- [ ]  入力（テキスト/画像URL）→ LLMノード
+- [ ]  **HTTPノード**で Slack `chat.postMessage` を設定（上記Blocks）
+- [ ]  エラー分岐（スキーマ違反・空出力時の再試行/人手エスカレーション）
+
+### フェーズ3：外部API（承認→発注）
+
+- [ ]  `/slack/interactions` 実装（署名検証含む）
+- [ ]  `trade_id` から候補JSONを引き当て（DB/一時KV）
+- [ ]  **Dry-run**で発注ワーカー動作確認（注文は出さずログのみ）
+- [ ]  Slackへ結果メッセ編集/返信（成功・失敗理由）
+
+### フェーズ4：本番ガード
+
+- [ ]  ホワイトリスト/サイズ上限/confidence閾値
+- [ ]  冪等性（`id` 単位で再実行防止）
+- [ ]  監査ログ保存（DB/Sheets/Notionのいずれか）
+- [ ]  Live切替 → 少額で段階的に検証
+
+---
