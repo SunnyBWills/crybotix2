@@ -16,10 +16,11 @@ export const tradeSchema = z.object({
   long_entry: numString,
   long_tp: numString,
   long_sl: numString,
+  long_volume: numString,
   short_entry: numString,
   short_tp: numString,
   short_sl: numString,
-  volume: numString,
+  short_volume: numString,
 });
 
 export type TradeData = z.infer<typeof tradeSchema>;
@@ -75,10 +76,15 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
 
   const disabled =
     !result.success ||
-    !data.volume ||
     (side === "long"
-      ? !data.long_entry || !data.long_tp || !data.long_sl
-      : !data.short_entry || !data.short_tp || !data.short_sl);
+      ? !data.long_entry ||
+        !data.long_tp ||
+        !data.long_sl ||
+        !data.long_volume
+      : !data.short_entry ||
+        !data.short_tp ||
+        !data.short_sl ||
+        !data.short_volume);
 
   const warn =
     side === "long"
@@ -95,10 +101,11 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
     const entry = side === "long" ? data.long_entry : data.short_entry;
     const tp = side === "long" ? data.long_tp : data.short_tp;
     const sl = side === "long" ? data.long_sl : data.short_sl;
+    const volume = side === "long" ? data.long_volume : data.short_volume;
     await fetch("/api/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ side, symbol: data.symbol, entry, tp, sl, volume: data.volume }),
+      body: JSON.stringify({ side, symbol: data.symbol, entry, tp, sl, volume }),
     });
   }
 
@@ -173,6 +180,18 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
             {errors[side === "long" ? "long_sl" : "short_sl"] && (
               <p className="text-xs text-red-500">
                 {errors[side === "long" ? "long_sl" : "short_sl"]}
+              </p>
+            )}
+          </div>
+          <div>
+            <Input
+              placeholder="Volume"
+              value={side === "long" ? data.long_volume : data.short_volume}
+              onChange={handleChange(side === "long" ? "long_volume" : "short_volume")}
+            />
+            {errors[side === "long" ? "long_volume" : "short_volume"] && (
+              <p className="text-xs text-red-500">
+                {errors[side === "long" ? "long_volume" : "short_volume"]}
               </p>
             )}
           </div>
