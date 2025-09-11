@@ -123,8 +123,14 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
         <CardHeader>{side === "long" ? "Long Inputs" : "Short Inputs"}</CardHeader>
         <CardContent>
           <div>
+            <label
+              htmlFor={`${side}-entry`}
+              className="mb-1 block text-sm"
+            >
+              Entry
+            </label>
             <Input
-              placeholder="Entry"
+              id={`${side}-entry`}
               value={side === "long" ? data.long_entry : data.short_entry}
               onChange={handleChange(side === "long" ? "long_entry" : "short_entry")}
             />
@@ -135,8 +141,14 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
             )}
           </div>
           <div>
+            <label
+              htmlFor={`${side}-tp`}
+              className="mb-1 block text-sm"
+            >
+              Take Profit
+            </label>
             <Input
-              placeholder="Take Profit"
+              id={`${side}-tp`}
               value={side === "long" ? data.long_tp : data.short_tp}
               onChange={handleChange(side === "long" ? "long_tp" : "short_tp")}
             />
@@ -147,8 +159,14 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
             )}
           </div>
           <div>
+            <label
+              htmlFor={`${side}-sl`}
+              className="mb-1 block text-sm"
+            >
+              Stop Loss
+            </label>
             <Input
-              placeholder="Stop Loss"
+              id={`${side}-sl`}
               value={side === "long" ? data.long_sl : data.short_sl}
               onChange={handleChange(side === "long" ? "long_sl" : "short_sl")}
             />
@@ -175,11 +193,10 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
 
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <Input
-            placeholder="Volume"
-            value={data.volume}
-            onChange={handleChange("volume")}
-          />
+          <label htmlFor="volume" className="mb-1 block text-sm">
+            Volume
+          </label>
+          <Input id="volume" value={data.volume} onChange={handleChange("volume")} />
           {errors.volume && <p className="text-xs text-red-500">{errors.volume}</p>}
         </div>
         <Button onClick={onOrder} disabled={disabled}>
