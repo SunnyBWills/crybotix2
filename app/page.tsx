@@ -10,10 +10,11 @@ const empty: TradeData = {
   long_entry: "",
   long_tp: "",
   long_sl: "",
+  long_volume: "",
   short_entry: "",
   short_tp: "",
   short_sl: "",
-  volume: "",
+  short_volume: "",
 };
 
 export default function Page() {
