@@ -16,21 +16,19 @@ export const tradeSchema = z.object({
   long_entry: numString,
   long_tp: numString,
   long_sl: numString,
+  long_volume: numString,
   short_entry: numString,
   short_tp: numString,
   short_sl: numString,
-  volume: numString,
+  short_volume: numString,
 });
 
 export type TradeData = z.infer<typeof tradeSchema>;
 
-const formatNumber = (n: number) =>
-  Number.isFinite(n) ? new Intl.NumberFormat().format(n) : "—";
 const formatPercent = (n: number) =>
   Number.isFinite(n) ? `${(n * 100).toFixed(2)}%` : "—";
 export function TradeDecision({ initial }: { initial: TradeData }) {
   const [data, setData] = useState<TradeData>(initial);
-  const [side, setSide] = useState<"long" | "short">("long");
 
   const result = tradeSchema.safeParse(data);
   const errors = useMemo(() => {
@@ -44,148 +42,164 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
   }, [result]);
 
   const metrics = useMemo(() => {
-    const entry = Number(side === "long" ? data.long_entry : data.short_entry);
-    const tp = Number(side === "long" ? data.long_tp : data.short_tp);
-    const sl = Number(side === "long" ? data.long_sl : data.short_sl);
-    if (!Number.isFinite(entry) || !Number.isFinite(tp) || !Number.isFinite(sl)) {
-      return { profitRate: NaN, lossRate: NaN, rr: NaN };
-    }
-    if (side === "long") {
-      const profitRate = (tp - entry) / entry;
-      const lossRate = (entry - sl) / entry;
-      return {
-        profitRate,
-        lossRate,
-        rr: profitRate / Math.max(lossRate, 1e-9),
-      };
-    } else {
-      const profitRate = (entry - tp) / entry;
-      const lossRate = (sl - entry) / entry;
-      return {
-        profitRate,
-        lossRate,
-        rr: profitRate / Math.max(lossRate, 1e-9),
-      };
-    }
-  }, [data, side]);
+    const calc = (side: "long" | "short") => {
+      const entry = Number(side === "long" ? data.long_entry : data.short_entry);
+      const tp = Number(side === "long" ? data.long_tp : data.short_tp);
+      const sl = Number(side === "long" ? data.long_sl : data.short_sl);
+      if (!Number.isFinite(entry) || !Number.isFinite(tp) || !Number.isFinite(sl)) {
+        return { profitRate: NaN, lossRate: NaN, rr: NaN };
+      }
+      if (side === "long") {
+        const profitRate = (tp - entry) / entry;
+        const lossRate = (entry - sl) / entry;
+        return { profitRate, lossRate, rr: profitRate / Math.max(lossRate, 1e-9) };
+      } else {
+        const profitRate = (entry - tp) / entry;
+        const lossRate = (sl - entry) / entry;
+        return { profitRate, lossRate, rr: profitRate / Math.max(lossRate, 1e-9) };
+      }
+    };
+    return { long: calc("long"), short: calc("short") };
+  }, [data]);
 
   const handleChange = (field: keyof TradeData) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => setData({ ...data, [field]: e.target.value });
 
-  const disabled =
-    !result.success ||
-    !data.volume ||
-    (side === "long"
-      ? !data.long_entry || !data.long_tp || !data.long_sl
-      : !data.short_entry || !data.short_tp || !data.short_sl);
+  const disabled = {
+    long:
+      !data.long_entry ||
+      !data.long_tp ||
+      !data.long_sl ||
+      !data.long_volume ||
+      Boolean(
+        errors.long_entry ||
+          errors.long_tp ||
+          errors.long_sl ||
+          errors.long_volume
+      ),
+    short:
+      !data.short_entry ||
+      !data.short_tp ||
+      !data.short_sl ||
+      !data.short_volume ||
+      Boolean(
+        errors.short_entry ||
+          errors.short_tp ||
+          errors.short_sl ||
+          errors.short_volume
+      ),
+  };
 
-  const warn =
-    side === "long"
-      ? !(
-          Number(data.long_sl) < Number(data.long_entry) &&
-          Number(data.long_entry) < Number(data.long_tp)
-        )
-      : !(
-          Number(data.short_tp) < Number(data.short_entry) &&
-          Number(data.short_entry) < Number(data.short_sl)
-        );
+  const warn = {
+    long: !(
+      Number(data.long_sl) < Number(data.long_entry) &&
+      Number(data.long_entry) < Number(data.long_tp)
+    ),
+    short: !(
+      Number(data.short_tp) < Number(data.short_entry) &&
+      Number(data.short_entry) < Number(data.short_sl)
+    ),
+  };
 
-  async function onOrder() {
+  async function onOrder(side: "long" | "short") {
     const entry = side === "long" ? data.long_entry : data.short_entry;
     const tp = side === "long" ? data.long_tp : data.short_tp;
     const sl = side === "long" ? data.long_sl : data.short_sl;
+    const volume = side === "long" ? data.long_volume : data.short_volume;
     await fetch("/api/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ side, symbol: data.symbol, entry, tp, sl, volume: data.volume }),
+      body: JSON.stringify({ side, symbol: data.symbol, entry, tp, sl, volume }),
     });
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <Button
-          className={cn(side === "long" && "bg-accent2")}
-          onClick={() => setSide("long")}
-        >
-          Long
-        </Button>
-        <Button
-          className={cn(side === "short" && "bg-accent2")}
-          onClick={() => setSide("short")}
-        >
-          Short
-        </Button>
-      </div>
+  const InputField = ({
+    label,
+    field,
+    placeholder,
+  }: {
+    label: string;
+    field: keyof TradeData;
+    placeholder: string;
+  }) => (
+    <div>
+      <div className="text-sm mb-1">{label}</div>
+      <Input
+        placeholder={placeholder}
+        value={(data[field] as string) ?? ""}
+        onChange={handleChange(field)}
+      />
+      {errors[field as string] && (
+        <p className="text-xs text-red-500">{errors[field as string]}</p>
+      )}
+    </div>
+  );
 
-      <Card>
-        <CardHeader>{side === "long" ? "Long Inputs" : "Short Inputs"}</CardHeader>
-        <CardContent>
-          <div>
-            <Input
-              placeholder="Entry"
-              value={side === "long" ? data.long_entry : data.short_entry}
-              onChange={handleChange(side === "long" ? "long_entry" : "short_entry")}
-            />
-            {errors[side === "long" ? "long_entry" : "short_entry"] && (
-              <p className="text-xs text-red-500">
-                {errors[side === "long" ? "long_entry" : "short_entry"]}
-              </p>
+  const SideCard = ({ side }: { side: "long" | "short" }) => (
+    <Card>
+      <CardHeader>{side === "long" ? "Long" : "Short"}</CardHeader>
+      <CardContent className="space-y-2">
+        <InputField
+          label="Entry"
+          field={side === "long" ? "long_entry" : "short_entry"}
+          placeholder="Entry"
+        />
+        <InputField
+          label="Take Profit"
+          field={side === "long" ? "long_tp" : "short_tp"}
+          placeholder="Take Profit"
+        />
+        <InputField
+          label="Stop Loss"
+          field={side === "long" ? "long_sl" : "short_sl"}
+          placeholder="Stop Loss"
+        />
+        <InputField
+          label="Volume"
+          field={side === "long" ? "long_volume" : "short_volume"}
+          placeholder="Volume"
+        />
+        <div className="pt-2 space-y-1">
+          <div className="text-sm">
+            Profit Rate: {formatPercent(metrics[side].profitRate)}
+          </div>
+          <div className="text-sm">
+            Loss Rate: {formatPercent(metrics[side].lossRate)}
+          </div>
+          <div
+            className={cn(
+              "text-sm",
+              metrics[side].rr < 1
+                ? "text-red-500"
+                : metrics[side].rr >= 1.5
+                ? "text-green-600"
+                : undefined
             )}
+          >
+            RR: {Number.isFinite(metrics[side].rr)
+              ? metrics[side].rr.toFixed(2)
+              : "—"}
           </div>
-          <div>
-            <Input
-              placeholder="Take Profit"
-              value={side === "long" ? data.long_tp : data.short_tp}
-              onChange={handleChange(side === "long" ? "long_tp" : "short_tp")}
-            />
-            {errors[side === "long" ? "long_tp" : "short_tp"] && (
-              <p className="text-xs text-red-500">
-                {errors[side === "long" ? "long_tp" : "short_tp"]}
-              </p>
-            )}
-          </div>
-          <div>
-            <Input
-              placeholder="Stop Loss"
-              value={side === "long" ? data.long_sl : data.short_sl}
-              onChange={handleChange(side === "long" ? "long_sl" : "short_sl")}
-            />
-            {errors[side === "long" ? "long_sl" : "short_sl"] && (
-              <p className="text-xs text-red-500">
-                {errors[side === "long" ? "long_sl" : "short_sl"]}
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>Result</CardHeader>
-        <CardContent>
-          <div className="text-sm">Profit Rate: {formatPercent(metrics.profitRate)}</div>
-          <div className="text-sm">Loss Rate: {formatPercent(metrics.lossRate)}</div>
-          <div className={cn("text-sm", metrics.rr < 1 ? "text-red-500" : metrics.rr >= 1.5 ? "text-green-600" : undefined)}>
-            RR: {Number.isFinite(metrics.rr) ? metrics.rr.toFixed(2) : "—"}
-          </div>
-          {warn && <div className="text-xs text-red-500">Check TP/SL order</div>}
-        </CardContent>
-      </Card>
-
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <Input
-            placeholder="Volume"
-            value={data.volume}
-            onChange={handleChange("volume")}
-          />
-          {errors.volume && <p className="text-xs text-red-500">{errors.volume}</p>}
+          {warn[side] && (
+            <div className="text-xs text-red-500">Check TP/SL order</div>
+          )}
         </div>
-        <Button onClick={onOrder} disabled={disabled}>
+        <Button
+          onClick={() => onOrder(side)}
+          disabled={disabled[side]}
+          className="mt-2"
+        >
           発注
         </Button>
-      </div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <SideCard side="long" />
+      <SideCard side="short" />
     </div>
   );
 }
