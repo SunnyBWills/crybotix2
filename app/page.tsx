@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { TradeDecision, tradeSchema, type TradeData } from "@/components/trade-decision";
 import { Positions } from "@/components/positions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +18,7 @@ const empty: TradeData = {
   short_volume: "",
 };
 
-export default function Page() {
+function PageContent() {
   const params = useSearchParams();
   let initial = empty;
   const value = params.get("value");
@@ -39,5 +40,13 @@ export default function Page() {
         <Positions />
       </TabsContent>
     </Tabs>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div />}>
+      <PageContent />
+    </Suspense>
   );
 }
