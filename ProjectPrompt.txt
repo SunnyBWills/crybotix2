@@ -22,6 +22,7 @@
       ▼
 [Dify Workflow]
   ├─ LLMノード（JSON Schema出力）
+  ├─ HTTPノード → 本アプリ `/api/ui/push` へトレードデータPOST（UI更新用）
   └─ HTTPノード → Slack chat.postMessage（承認/却下ボタン）
                          │
                          ▼

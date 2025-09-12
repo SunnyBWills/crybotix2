@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import { TradeDecision, tradeSchema, type TradeData } from "@/components/trade-decision";
+import { TradeDecision } from "@/components/trade-decision";
+import { tradeSchema, type TradeData } from "@/lib/trade";
 import { Positions } from "@/components/positions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "next/navigation";

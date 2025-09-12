@@ -1,29 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-const numString = z.string().refine((s) => s === "" || !isNaN(Number(s)), {
-  message: "Invalid",
-});
-
-export const tradeSchema = z.object({
-  symbol: z.string(),
-  long_entry: numString,
-  long_tp: numString,
-  long_sl: numString,
-  long_volume: numString,
-  short_entry: numString,
-  short_tp: numString,
-  short_sl: numString,
-  short_volume: numString,
-});
-
-export type TradeData = z.infer<typeof tradeSchema>;
+import { tradeSchema, type TradeData } from "@/lib/trade";
 
 const formatPercent = (n: number) =>
   Number.isFinite(n) ? `${(n * 100).toFixed(2)}%` : "—";
