@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { tradeSchema, type TradeData } from "@/lib/trade";
+import { InputImageUpload } from "@/components/input-image-upload";
 
 const formatPercent = (n: number) =>
   Number.isFinite(n) ? `${(n * 100).toFixed(2)}%` : "—";
@@ -202,9 +203,12 @@ export function TradeDecision({ initial }: { initial: TradeData }) {
   );
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <SideCard side="long" />
-      <SideCard side="short" />
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <SideCard side="long" />
+        <SideCard side="short" />
+      </div>
+      <InputImageUpload />
     </div>
   );
 }
