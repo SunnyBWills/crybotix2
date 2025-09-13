@@ -32,6 +32,8 @@ export async function POST(req: Request) {
     }
     const arrayBuffer = await image.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const mimeType = image.type || "image/png";
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await client.responses.create({
@@ -45,11 +47,10 @@ export async function POST(req: Request) {
           role: "user",
           content: [
             { type: "input_text", text: "画像を解析して" },
-            { type: "input_image", image_base64: base64 },
+            { type: "input_image", image_url: dataUrl, detail: "high" },
           ],
         },
       ],
-      response_format: { type: "json_schema", json_schema: schema },
     });
     const text = response.output_text;
     let json;
