@@ -7,13 +7,6 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const ingestToken = process.env.INGEST_TOKEN;
-  const authHeader = req.headers.get("Authorization");
-
-  if (!authHeader || authHeader !== `Bearer ${ingestToken}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const data = await req.json();
     tradeSchema.parse(data);
