@@ -52,7 +52,6 @@ export async function POST(req: Request) {
         },
       ],
       reasoning: { effort: "medium" },
-      text: { verbosity: "medium" },
     });
     const text = response.output_text;
     let json;
