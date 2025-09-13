@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { logError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -30,11 +31,11 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const image = form.get("image");
     if (!image || !(image instanceof File)) {
-      console.error("INPUT: no image or wrong field type");
+      logError({ name: "INPUT", message: "no image or wrong field type" });
       return NextResponse.json({ error: "No image" }, { status: 400 });
     }
     if (!process.env.OPENAI_API_KEY) {
-      console.error("INPUT: OPENAI_API_KEY missing");
+      logError({ name: "INPUT", message: "OPENAI_API_KEY missing" });
       return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 
@@ -69,13 +70,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(json);
   } catch (err: any) {
-    console.error("INPUT ERROR:", {
-      name: err?.name,
-      message: err?.message,
-      status: err?.status,
-      data: err?.response?.data,
-      stack: err?.stack,
-    });
+    logError(err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
