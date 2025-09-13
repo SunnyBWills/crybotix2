@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+export const runtime = "nodejs";
+
 const schema = {
   name: "input_v1",
   strict: true,
@@ -28,41 +30,52 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const image = form.get("image");
     if (!image || !(image instanceof File)) {
+      console.error("INPUT: no image or wrong field type");
       return NextResponse.json({ error: "No image" }, { status: 400 });
     }
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("INPUT: OPENAI_API_KEY missing");
+      return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+
     const arrayBuffer = await image.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = image.type || "image/png";
     const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.responses.create({
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+    const res = await client.responses.create({
       model: "gpt-5",
       input: [
-        {
-          role: "system",
-          content: prompt,
-        },
+        { role: "system", content: prompt },
         {
           role: "user",
           content: [
             { type: "input_text", text: "画像を解析して" },
-            { type: "input_image", image_url: dataUrl, detail: "high" },
-          ],
+            { type: "input_image", image_url: dataUrl },
+          ] as any,
         },
       ],
-      reasoning: { effort: "medium" },
-    });
-    const text = response.output_text;
+      response_format: { type: "json_schema", json_schema: schema },
+      reasoning_effort: "medium",
+      verbosity: "medium",
+    } as any);
+    const text = res.output_text;
     let json;
     try {
       json = JSON.parse(text);
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: "Failed to parse", text }, { status: 500 });
     }
     return NextResponse.json(json);
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    console.error("INPUT ERROR:", {
+      name: err?.name,
+      message: err?.message,
+      status: err?.status,
+      data: err?.response?.data,
+      stack: err?.stack,
+    });
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
