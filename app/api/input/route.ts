@@ -57,9 +57,11 @@ export async function POST(req: Request) {
           ] as any,
         },
       ],
-      text: { format: { type: "json_schema", json_schema: schema } },
-      reasoning_effort: "medium",
-      verbosity: "medium",
+      text: {
+        format: { type: "json_schema", json_schema: schema },
+        verbosity: "medium",
+      },
+      reasoning: { effort: "medium" },
     } as any);
     const text = res.output_text;
     let json;
