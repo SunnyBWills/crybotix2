@@ -13,13 +13,13 @@ export function InputImageUpload() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
-    const form = new FormData();
-    form.append("image", file);
+    const formData = new FormData();
+    formData.append("image", file);
     setLoading(true);
     try {
       const res = await fetch("/api/input", {
         method: "POST",
-        body: form,
+        body: formData,
       });
       const text = await res.text();
       if (res.ok) {
