@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,29 @@ const formatPercent = (n: number) =>
   Number.isFinite(n) ? `${(n * 100).toFixed(2)}%` : "—";
 export function TradeDecision({ initial }: { initial: TradeData }) {
   const [data, setData] = useState<TradeData>(initial);
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchLatest() {
+      try {
+        const res = await fetch("/api/ui/push");
+        if (!res.ok) return;
+        const json = await res.json();
+        const parsed = tradeSchema.safeParse(json);
+        if (parsed.success && !ignore) {
+          setData(parsed.data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch trade", e);
+      }
+    }
+    fetchLatest();
+    const id = setInterval(fetchLatest, 5000);
+    return () => {
+      ignore = true;
+      clearInterval(id);
+    };
+  }, []);
 
   const result = tradeSchema.safeParse(data);
   const errors = useMemo(() => {
