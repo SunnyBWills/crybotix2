@@ -57,7 +57,7 @@ export async function POST(req: Request) {
           ] as any,
         },
       ],
-      response_format: { type: "json_schema", json_schema: schema },
+      text: { format: { type: "json_schema", json_schema: schema } },
       reasoning_effort: "medium",
       verbosity: "medium",
     } as any);
