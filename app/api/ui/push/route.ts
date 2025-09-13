@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { tradeSchema, type TradeData } from "@/lib/trade";
+import { tradeSchema } from "@/lib/trade";
 
-let latestTrade: TradeData | null = null;
+export async function GET() {
+  return NextResponse.json({ status: "public ok" });
+}
 
 export async function POST(req: Request) {
+  const ingestToken = process.env.INGEST_TOKEN;
+  const authHeader = req.headers.get("Authorization");
+
+  if (!authHeader || authHeader !== `Bearer ${ingestToken}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const data = await req.json();
-    const trade = tradeSchema.parse(data);
-    latestTrade = trade;
-    console.log("Received trade", trade);
+    tradeSchema.parse(data);
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof ZodError) {
@@ -19,9 +26,3 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
-  if (latestTrade) {
-    return NextResponse.json(latestTrade);
-  }
-  return NextResponse.json({});
-}
